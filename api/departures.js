@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const url = "https://transport.integration.sl.se/v1/sites/9302/departures";
+  const url = "https://transport.integration.sl.se/v1/sites/1724/departures";
 
   try {
     const response = await fetch(url);
