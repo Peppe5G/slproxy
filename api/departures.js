@@ -1,7 +1,9 @@
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const url = "https://transport.integration.sl.se/v1/sites/1724/departures";
+  const siteId = req.query.siteId || "1724"; // Tar från URL om det finns, annars standard
+
+  const url = `https://transport.integration.sl.se/v1/sites/${siteId}/departures`;
 
   try {
     const response = await fetch(url);
