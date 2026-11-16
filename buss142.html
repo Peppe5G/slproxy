@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buss 142 från Safirgränd</title>
+  <style>
+    html, body {
+      background-color: transparent !important;
+      color: white;
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 5vw;
+      margin: 1rem 0 0.5rem;
+      font-weight: 500;
+    }
+
+    table {
+      width: 95%;
+      max-width: 700px;
+      margin: 0 auto;
+      border-collapse: collapse;
+      font-size: 4vw;
+    }
+
+    @media (min-width: 600px) {
+      h1 { font-size: 2rem; }
+      table { font-size: 1.2rem; }
+    }
+
+    th, td {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 0.4em 0.6em;
+    }
+
+    th {
+      background-color: rgba(255, 255, 255, 0.08);
+      font-weight: 600;
+    }
+
+    button {
+      background: none;
+      color: #bbb;
+      border: 1px solid #444;
+      padding: 0.3em 1em;
+      margin-top: 1em;
+      font-size: 0.9em;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      color: white;
+      border-color: #666;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    #updated {
+      font-size: 0.8em;
+      margin-top: 0.5em;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <h1>Buss 142 från Safirgränd</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Linje</th>
+        <th>Destination</th>
+        <th>Avgår</th>
+      </tr>
+    </thead>
+    <tbody id="departure-table">
+      <tr><td colspan="3">Laddar...</td></tr>
+    </tbody>
+  </table>
+
+  <button onclick="updateDepartures()">Uppdatera</button>
+  <div id="updated"></div>
+
+  <script>
+    // Samma uppdateringsschema som tidigare. 0 = vila (ingen hämtning).
+    function getRefreshInterval() {
+      const now = new Date();
+      const day = now.getDay(); // 0 = Söndag, 6 = Lördag
+      const mins = now.getHours() * 60 + now.getMinutes();
+
+      if (day >= 1 && day <= 5) {
+        if (mins >= 390 && mins <= 569) return 30 * 1000;       // 06:30–09:29
+        if (mins >= 570 && mins <= 1439) return 5 * 60 * 1000;   // 09:30–23:59
+        return 0;
+      }
+
+      if (day === 0 || day === 6) {
+        if (mins >= 480 && mins <= 1200) return 60 * 1000;       // 08:00–20:00
+        return 0;
+      }
+
+      return 0;
+    }
+
+    async function updateDepartures() {
+      try {
+        // Relativ adress: sidan och proxyn ligger på samma Vercel-projekt
+        const res = await fetch("/api/departures", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const departures = (data.departures || []).filter(dep => dep.line && dep.line.designation === "142");
+
+        const table = document.getElementById("departure-table");
+        table.innerHTML = "";
+
+        if (departures.length === 0) {
+          table.innerHTML = "<tr><td colspan='3'>Inga kommande avgångar</td></tr>";
+        } else {
+          departures.slice(0, 5).forEach(dep => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${dep.line.designation}</td>
+              <td>${dep.destination}</td>
+              <td>${dep.display}</td>
+            `;
+            table.appendChild(row);
+          });
+        }
+
+        document.getElementById("updated").textContent =
+          "Senast uppdaterad: " + new Date().toLocaleTimeString("sv-SE");
+      } catch (err) {
+        document.getElementById("departure-table").innerHTML =
+          `<tr><td colspan="3">Fel vid hämtning: ${err.message}</td></tr>`;
+      }
+    }
+
+    // Schemaläggaren kollar om varje minut vilket intervall som gäller,
+    // så sidan vaknar själv på morgonen även om den laddades mitt i natten.
+    let lastFetch = 0;
+    function tick() {
+      const interval = getRefreshInterval();
+      if (interval > 0 && Date.now() - lastFetch >= interval) {
+        lastFetch = Date.now();
+        updateDepartures();
+      }
+    }
+
+    updateDepartures();
+    lastFetch = Date.now();
+    setInterval(tick, 15 * 1000);
+  </script>
+</body>
+</html>
